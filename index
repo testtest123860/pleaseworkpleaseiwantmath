@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Math Asteroids - Squares</title>
+  <style>
+    body { text-align: center; font-family: Arial; background: black; color: white; }
+    #game { position: relative; width: 600px; height: 500px; margin: auto; border: 2px solid white; overflow: hidden; background: black; }
+    .star { position: absolute; background: white; border-radius: 50%; }
+    .asteroid { position: absolute; display: flex; align-items: center; justify-content: center; font-weight: bold; color: white; text-shadow: 2px 2px 4px black; border-radius: 50%; box-shadow: inset -10px -10px 20px rgba(0,0,0,0.7); }
+    .explosion-particle { position: absolute; width: 6px; height: 6px; border-radius: 50%; pointer-events: none; }
+    .laser { position: absolute; width: 4px; height: 12px; background: yellow; border-radius: 2px; pointer-events: none; }
+    #menu, #gameOver { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; background: rgba(0,0,0,0.9); align-items: center; justify-content: center; flex-direction: column; font-size: 22px; }
+    #gameOver { font-size: 40px; }
+    button { font-size: 18px; margin: 10px; padding: 10px 20px; }
+    .options { margin: 10px; }
+  </style>
+</head>
+<body>
+<h1>Meteor Math</h1>
+<div id="game"></div>
+<input id="answer" placeholder="Type answer and press Enter">
+<div id="score">
+Score: <span id="scoreValue">0</span>
+Lives: <span id="lives">3</span>
+High Score: <span id="highScore">0</span>
+</div>
+
+<script>
+const game = document.getElementById("game");
+const answerBox = document.getElementById("answer");
+
+let asteroids = [];
+let score = 0;
+let lives = 3;
+let gameRunning = false;
+let spawnRate = 2000;
+let spawnInterval;
+let operations = { add:true, sub:true, mul:true, div:true, sq:false };
+
+let highScore = localStorage.getItem("mathAsteroidsHighScore") || 0;
+document.getElementById("highScore").innerText = highScore;
+function updateHighScore(){
+  if(operations.add && operations.sub && operations.mul && operations.div){
+    if(score > highScore){
+      highScore = score;
+      localStorage.setItem("mathAsteroidsHighScore", score);
+      document.getElementById("highScore").innerText = score;
+    }
+  }
+}
+
+/* Menu */
+let menu = document.createElement("div");
+menu.id = "menu";
+menu.innerHTML = `
+  <div style="font-size:36px;margin-bottom:20px;">Math Asteroids</div>
+  <div class="options">
+    <label><input type="checkbox" id="add" checked> Addition</label>
+    <label><input type="checkbox" id="sub" checked> Subtraction</label>
+  </div>
+  <div class="options">
+    <label><input type="checkbox" id="mul" checked> Multiplication</label>
+    <label><input type="checkbox" id="div" checked> Division</label>
+  </div>
+  <div class="options">
+    <label><input type="checkbox" id="sq"> Squares (Extra Challenging)</label>
+  </div>
+  <button onclick="startGame()">Play</button>
+`;
+game.appendChild(menu);
+
+/* Game Over */
+let gameOverScreen = document.createElement("div");
+gameOverScreen.id = "gameOver";
+gameOverScreen.innerHTML = `<div>GAME OVER</div><button onclick="restartGame()">Restart</button>`;
+game.appendChild(gameOverScreen);
+
+/* Stars */
+for(let i=0;i<80;i++){
+  let star=document.createElement("div");
+  star.className="star";
+  let size=Math.random()*3+1;
+  star.style.width=size+"px";
+  star.style.height=size+"px";
+  star.style.left=Math.random()*600+"px";
+  star.style.top=Math.random()*500+"px";
+  game.appendChild(star);
+}
+
+/* Start */
+function startGame(){
+  operations.add = document.getElementById("add").checked;
+  operations.sub = document.getElementById("sub").checked;
+  operations.mul = document.getElementById("mul").checked;
+  operations.div = document.getElementById("div").checked;
+  operations.sq  = document.getElementById("sq").checked;
+  if(!operations.add && !operations.sub && !operations.mul && !operations.div && !operations.sq){
+    alert("Select at least one operation");
+    return;
+  }
+  menu.style.display = "none";
+  gameRunning = true;
+  answerBox.focus();
+  spawnRate = 2000;
+  spawnInterval = setInterval(spawnAsteroid, spawnRate);
+
+  setInterval(()=>{
+    if(spawnRate>1200){
+      spawnRate -= 100;
+      clearInterval(spawnInterval);
+      spawnInterval = setInterval(spawnAsteroid, spawnRate);
+    }
+  },10000);
+}
+
+/* Random problem */
+function randomProblem(){
+  let a=Math.floor(Math.random()*12)+1;
+  let b=Math.floor(Math.random()*12)+1;
+  let available=[];
+  if(operations.add) available.push("add");
+  if(operations.sub) available.push("sub");
+  if(operations.mul) available.push("mul");
+  if(operations.div) available.push("div");
+  if(operations.sq)  available.push("sq");
+  let type = available[Math.floor(Math.random()*available.length)];
+  let color;
+  if(type==="add"){color="green"; return {text:a+" + "+b, answer:a+b, type, color};}
+  if(type==="sub"){color="blue"; return {text:(a+b)+" - "+a, answer:b, type, color};}
+  if(type==="mul"){color="orange"; return {text:a+" × "+b, answer:a*b, type, color};}
+  if(type==="div"){color="purple"; return {text:(a*b)+" ÷ "+a, answer:b, type, color};}
+  if(type==="sq"){color="pink"; return {text:a+"²", answer:a*a, type, color};}
+}
+
+/* Spawn asteroid */
+function spawnAsteroid(){
+  if(!gameRunning) return;
+  let problem=randomProblem();
+  let div=document.createElement("div");
+  div.className="asteroid";
+  div.style.background=`radial-gradient(circle at 30% 30%, ${problem.color}, #555, #222)`;
+  let size=60+Math.random()*30;
+  div.style.width=size+"px";
+  div.style.height=size+"px";
+  div.innerText = problem.text;
+  div.style.left = Math.random()*520+"px";
+  div.style.top = "0px";
+  game.appendChild(div);
+  asteroids.push({element: div, y:0, answer: problem.answer, type: problem.type, size: size});
+}
+
+/* Laser from bottom */
+function fireLaser(a){
+  let x = parseFloat(a.element.style.left) + a.size/2;
+  let y = 500;
+  let laser = document.createElement("div");
+  laser.className="laser";
+  laser.style.left = x-2+"px";
+  laser.style.top = y+"px";
+  game.appendChild(laser);
+
+  let steps = 30;
+  let dy = (parseFloat(a.element.style.top)+a.size/2 - y)/steps;
+  let count = 0;
+  let interval = setInterval(()=>{
+    count++;
+    laser.style.top = parseFloat(laser.style.top) + dy + "px";
+    if(count>=steps){
+      clearInterval(interval);
+      game.removeChild(laser);
+      explode(a);
+      game.removeChild(a.element);
+      asteroids.splice(asteroids.indexOf(a),1);
+      score++;
+      document.getElementById("scoreValue").innerText = score;
+    }
+  }, 20);
+}
+
+/* Explosion */
+function explode(a){
+  let rect=a.element.getBoundingClientRect();
+  let gameRect=game.getBoundingClientRect();
+  let x=rect.left-gameRect.left + a.size/2;
+  let y=rect.top-gameRect.top + a.size/2;
+
+  for(let i=0;i<10;i++){
+    let p=document.createElement("div");
+    p.className="explosion-particle";
+    p.style.left=x+"px";
+    p.style.top=y+"px";
+    p.style.background=a.element.style.background;
+    game.appendChild(p);
+    let dx2=(Math.random()-0.5)*8;
+    let dy2=(Math.random()-0.5)*8;
+    let life=0;
+    let interval=setInterval(()=>{
+      life++;
+      p.style.left=parseFloat(p.style.left)+dx2+"px";
+      p.style.top=parseFloat(p.style.top)+dy2+"px";
+      p.style.opacity = 1-life/15;
+      if(life>15){
+        clearInterval(interval);
+        game.removeChild(p);
+      }
+    },30);
+  }
+}
+
+/* Update loop */
+function update(){
+  if(!gameRunning) return;
+  for(let i=asteroids.length-1;i>=0;i--){
+    let a = asteroids[i];
+    a.y += 1.5;
+    a.element.style.top = a.y + "px";
+    if(a.y + a.size >= 500){
+      game.removeChild(a.element);
+      asteroids.splice(i,1);
+      lives--;
+      document.getElementById("lives").innerText = lives;
+    }
+  }
+  if(lives<=0){
+    gameRunning=false;
+    updateHighScore();
+    gameOverScreen.style.display="flex";
+  }
+}
+
+/* Answer input */
+answerBox.addEventListener("keydown", function(e){
+  if(e.key==="Enter"){
+    let val=parseInt(answerBox.value);
+    for(let i=asteroids.length-1;i>=0;i--){
+      let a = asteroids[i];
+      if(a.answer===val){
+        fireLaser(a);
+      }
+    }
+    answerBox.value="";
+  }
+});
+
+function restartGame(){
+  asteroids.forEach(a=>game.removeChild(a.element));
+  asteroids=[];
+  score=0;
+  lives=3;
+  document.getElementById("scoreValue").innerText=0;
+  document.getElementById("lives").innerText=3;
+  gameOverScreen.style.display="none";
+  menu.style.display="flex";
+  gameRunning=false;
+  clearInterval(spawnInterval);
+}
+
+spawnInterval=setInterval(spawnAsteroid,spawnRate);
+setInterval(update,30);
+</script>
+</body>
+</html>
